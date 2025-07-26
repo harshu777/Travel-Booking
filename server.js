@@ -25,10 +25,10 @@ const upload = multer({ storage: storage });
 
 // --- Database Configuration ---
 const dbConfig = {
-  host: 'localhost',
-  user: 'root',
-  password: '', // Your MySQL password
-  database: 'b2b_travel_booking_platform'
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_DATABASE || 'b2b_travel_booking_platform'
 };
 const JWT_SECRET = '641732b01d47293b26c0ca00bd8ffec6d29c14f2460bd0210654dfa7f164ff027fa314d56755794de99b8602e68217cc4eea94f1540de11270efb7bfb2fb7b4e';
 
