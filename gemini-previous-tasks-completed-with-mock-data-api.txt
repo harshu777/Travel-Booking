@@ -1,0 +1,96 @@
+Phase 1: Initial Project & Frontend Setup
+
+   * Objective: Create the basic file structure for a React application and configure styling.
+   * Technology: React with Vite, Tailwind CSS.
+   * Key Files Created: index.html, package.json, src/main.jsx, src/App.jsx, src/index.css,
+     tailwind.config.js, postcss.config.js.
+   * Actions: Installed Node.js dependencies (react, vite, tailwindcss, etc.) and configured Tailwind CSS.
+     Resolved an early issue with a pre-release version of Tailwind by downgrading to a stable release.
+
+  ---
+
+  Phase 2: Database Schema Design & Refinement
+
+   * Objective: Design and later refine the core database structure for scalability and integrity.
+   * Technology: MySQL.
+   * Key Files: schema.sql.
+   * Tables Defined: users, wallets, transactions, bookings, reports, api_keys, commissions.
+   * Actions & Decisions:
+       * Initially created the schema with all necessary tables.
+       * Later refined the schema to improve data integrity by adding a DEFAULT value to kyc_status, adding a
+         foreign key to related_booking_id, and adding ON DELETE CASCADE to relevant foreign keys to ensure
+         clean data removal.
+       * Guided you to drop and recreate the database with the updated schema to ensure a clean and correct
+         structure.
+
+  ---
+
+  Phase 3: Backend Server & Core APIs
+
+   * Objective: Build a secure, transactional backend server.
+   * Technology: Node.js, Express.js.
+   * Key Files: server.js.
+   * Dependencies: express, mysql2, cors.
+   * Key Features:
+       * Established a connection pool to the MySQL database for efficient query handling.
+       * Implemented robust transactional logic (beginTransaction, commit, rollback) for all booking and
+         cancellation operations to prevent data corruption.
+
+  ---
+
+  Phase 4: Authentication (Backend & Frontend)
+
+   * Objective: Implement a secure user authentication system.
+   * Technology: JWT (JSON Web Tokens), bcrypt for password hashing.
+   * Dependencies: bcryptjs, jsonwebtoken, jwt-decode.
+   * Backend (in `server.js`):
+       * POST /api/auth/register: Securely registers new users with hashed passwords.
+       * POST /api/auth/login: Authenticates users and issues a JWT containing their id and role.
+       * verifyToken Middleware: Protects designated routes from unauthorized access.
+   * Frontend:
+       * Created AgentLoginForm.jsx and AgentRegistrationForm.jsx to handle user input.
+       * Stored the JWT in localStorage upon login to maintain the session.
+       * Bug Fix: Corrected a typo (e.gittarget.value) in the registration form.
+
+  ---
+
+  Phase 5: Agent-Facing Features
+
+   * Objective: Build the core features for travel agents.
+   * Key Components & Pages:
+       * DashboardPage.jsx: The agent's landing page, displaying wallet balance and quick actions.
+       * FlightSearchPage.jsx & FlightBookingForm.jsx: A complete workflow for searching mock flights,
+         selecting one, and booking it by providing passenger details.
+       * HotelSearchPage.jsx & HotelBookingForm.jsx: A complete workflow for searching mock hotels, viewing
+         rooms, selecting a room, and booking it by providing guest details.
+       * MyBookingsPage.jsx: A page to view a complete history of all personal bookings (flights and hotels).
+       * WalletTopUpModal.jsx: A component to add funds to the agent's wallet.
+   * Backend API Support:
+       * Search: GET /api/flights/search, GET /api/hotels/search, GET /api/hotels/:hotelId/rooms.
+       * Booking: POST /api/flights/book, POST /api/hotels/book.
+       * Cancellation: POST /api/flights/cancel, POST /api/hotels/cancel.
+       * Data Fetching: GET /api/wallet, GET /api/transactions, GET /api/bookings.
+   * Bug Fix: Restored the wallet and transactions API routes to server.js after they were accidentally
+     removed, fixing 404 errors on the dashboard.
+
+  ---
+
+  Phase 6: Admin-Facing Features
+
+   * Objective: Build a comprehensive dashboard for administrators to manage the platform.
+   * Key Components & Pages:
+       * AdminDashboard.jsx: A tabbed interface for all admin functions.
+       * AdminRoute.jsx: A special routing component to ensure only users with the 'admin' role (verified from
+          the JWT) can access the dashboard.
+       * components/admin/: A new directory containing components for each admin task:
+           * AgentManagement.jsx: Lists all agents.
+           * BookingReconciliation.jsx: Lists all bookings from all agents.
+           * CommissionManagement.jsx: A form to view and update platform commission rates.
+           * AnalyticsReports.jsx: Displays a mock sales chart using the recharts library.
+           * SupportTickets.jsx: Displays a list of mock support tickets.
+   * Backend API Support:
+       * verifyAdmin Middleware: A new middleware that checks for role: 'admin'.
+       * GET /api/admin/agents, GET /api/admin/bookings, GET /api/admin/commissions, POST
+         /api/admin/commissions, and mock endpoints for analytics and tickets.
+   * Bug Fix: Corrected a module import error for the jwt-decode library in AdminRoute.jsx and App.jsx by
+     changing the import syntax from import jwt_decode to import { jwtDecode }.

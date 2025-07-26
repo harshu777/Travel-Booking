@@ -1,0 +1,121 @@
+Phase 1: Initial Project & Frontend Setup
+
+   * Objective: Create the basic file structure for a React application and configure styling.
+   * Technology: React with Vite, Tailwind CSS.
+   * Key Files Created: index.html, package.json, src/main.jsx, src/App.jsx, src/index.css,
+     tailwind.config.js, postcss.config.js.
+   * Actions: Installed Node.js dependencies and configured Tailwind CSS. Resolved an issue with a pre-release
+      version of Tailwind by downgrading to a stable release.
+
+  ---
+
+  Phase 2: Database Schema Design & Refinement
+
+   * Objective: Design and later refine the core database structure.
+   * Technology: MySQL.
+   * Key Files: schema.sql.
+   * Tables Defined: users, wallets, transactions, bookings, reports, api_keys, commissions.
+   * Actions & Decisions:
+       * Initially created the schema with all necessary tables.
+       * Later refined the schema to improve data integrity by:
+           * Adding a DEFAULT 'pending' value to the kyc_status in the users table.
+           * Adding a foreign key constraint to link transactions.related_booking_id to the bookings table.
+           * Adding ON DELETE CASCADE to relevant foreign keys to ensure that deleting a user cleanly removes
+             all their associated data.
+       * Guided you to drop and recreate the database with the updated schema to ensure a clean state.
+
+  ---
+
+  Phase 3: Backend Server & Core Authentication
+
+   * Objective: Build a secure backend server to manage data and user authentication.
+   * Technology: Node.js, Express.js, JWT, bcrypt.
+   * Key Files: server.js.
+   * Dependencies: express, mysql2, cors, bcryptjs, jsonwebtoken.
+   * API Endpoints:
+       * POST /api/auth/register: Handles new user registration.
+       * POST /api/auth/login: Authenticates users and returns a JWT.
+   * Key Features: Implemented a verifyToken middleware to protect routes and used a connection pool for
+     efficient database interactions.
+
+  ---
+
+  Phase 4: Frontend Authentication UI & Routing
+
+   * Objective: Build the user interface for login/registration and enable navigation.
+   * Technology: React, React Router.
+   * Dependencies: react-router-dom.
+   * Key Files: src/components/MessageBox.jsx, src/components/AgentLoginForm.jsx,
+     src/components/AgentRegistrationForm.jsx, src/pages/LoginPage.jsx, src/pages/RegisterPage.jsx.
+   * Actions: Set up the main application router in App.jsx. Fixed a bug in the registration form's password
+     input.
+
+  ---
+
+  Phase 5: Agent Dashboard & Wallet Functionality
+
+   * Objective: Create a secure dashboard for logged-in agents.
+   * Key Files: src/pages/DashboardPage.jsx, src/components/WalletTopUpModal.jsx,
+     src/components/ProtectedRoute.jsx.
+   * API Endpoints Added: GET /api/wallet, GET /api/transactions, POST /api/wallet/topup.
+   * Actions & Decisions:
+       * Built the dashboard UI to display wallet balance and quick actions.
+       * Implemented the wallet top-up feature with a modal.
+       * Bug Fix: Later identified that these API endpoints were accidentally removed during a server file
+         rewrite. They were successfully restored to fix 404 Not Found errors on the dashboard.
+
+  ---
+
+  Phase 6: Flight Booking & Cancellation Flow
+
+   * Objective: Implement the end-to-end process for searching, booking, and canceling flights.
+   * Key Files: src/pages/FlightSearchPage.jsx, src/components/FlightBookingForm.jsx.
+   * API Endpoints Added:
+       * GET /api/flights/search: A mock endpoint to return dummy flight data.
+       * POST /api/flights/book: A transactional endpoint that updates the wallet and saves the booking.
+       * POST /api/flights/cancel: A transactional endpoint that cancels the booking and refunds the wallet.
+   * Key Features: A seamless single-page workflow where the search results are replaced by the booking form
+     upon selection.
+
+  ---
+
+  Phase 7: Hotel Booking & Cancellation Flow
+
+   * Objective: Implement the end-to-end process for searching, booking, and canceling hotels.
+   * Key Files: src/pages/HotelSearchPage.jsx, src/components/HotelBookingForm.jsx.
+   * API Endpoints Added:
+       * GET /api/hotels/search: A mock endpoint for hotel data.
+       * GET /api/hotels/:hotelId/rooms: A mock endpoint for room data.
+       * POST /api/hotels/book: A transactional endpoint for hotel bookings.
+       * POST /api/hotels/cancel: A transactional endpoint for hotel cancellations.
+   * Actions & Decisions:
+       * Initially built a simple booking flow.
+       * Refactored and improved the flow by creating a dedicated HotelBookingForm.jsx to properly collect
+         guest details, which were missing from the initial version.
+
+  ---
+
+  Phase 8: Booking Management Page
+
+   * Objective: Allow agents to view their booking history and perform actions.
+   * Key Files: src/pages/MyBookingsPage.jsx.
+   * API Endpoints Added: GET /api/bookings.
+   * Key Features:
+       * Created a "My Bookings" page accessible from the main navigation.
+       * The page fetches and displays all of the agent's flight and hotel bookings in a table.
+       * A "Cancel" button is shown for active bookings, which calls the appropriate cancellation API and
+         updates the UI.
+
+  ---
+
+  Phase 9: Reporting (In Progress)
+
+   * Objective: Begin building a reports page for agents.
+   * API Endpoints Added: GET /api/reports/summary.
+   * Actions:
+       * Added a new backend endpoint to calculate and return a summary of an agent's sales, total bookings,
+         and commission earned based on predefined rates.
+       * The next step is to build the frontend page to display this data.
+
+  This brings us to our current state. The application is robust, with full booking and cancellation flows
+  for both flights and hotels, and we have just started laying the groundwork for the reporting feature.

@@ -1,0 +1,117 @@
+ Phase 1: Initial Project & Frontend Setup
+
+   * Objective: Create the basic file structure for a React application and configure styling.
+   * Technology: React with Vite, Tailwind CSS.
+   * Key Files Created:
+       * index.html: The main HTML entry point.
+       * package.json: Configured for a Vite + React project.
+       * src/main.jsx: Renders the root App component.
+       * src/App.jsx: The main application component (initially a placeholder).
+       * src/index.css: Configured with Tailwind CSS's @tailwind directives.
+       * tailwind.config.js & postcss.config.js: Configuration files for Tailwind CSS.
+   * Actions & Decisions:
+       * Installed all necessary Node.js dependencies (npm install).
+       * Troubleshot and resolved an issue with a pre-release version of Tailwind CSS by downgrading to the
+         latest stable version (tailwindcss@3).
+
+  ---
+
+  Phase 2: Database Schema Design
+
+   * Objective: Design the core database structure for the platform.
+   * Technology: MySQL.
+   * Key Files Created:
+       * schema.sql: Contains the CREATE TABLE statements for the entire database.
+   * Tables Defined:
+       * users: For agent and admin user data.
+       * wallets: To store agent balances.
+       * transactions: For all credit/debit operations.
+       * bookings: To hold flight and hotel booking details.
+       * reports: For generating reports.
+       * api_keys: For storing third-party API credentials.
+       * commissions: To manage agent commission rates.
+
+  ---
+
+  Phase 3: Backend Server & Authentication API
+
+   * Objective: Build a secure backend server to manage data and user authentication.
+   * Technology: Node.js, Express.js, JWT, bcrypt.
+   * Key Files Created/Modified:
+       * server.js: The main Express server file.
+   * Dependencies Installed:
+       * express: The web server framework.
+       * mysql2: To connect to the MySQL database (using connection pooling).
+       * cors: To handle cross-origin requests from the frontend.
+       * bcryptjs: For securely hashing user passwords.
+       * jsonwebtoken: For creating and verifying JSON Web Tokens (JWTs) for authentication.
+   * API Endpoints Created:
+       * POST /api/auth/register: Handles new user registration, including password hashing.
+       * POST /api/auth/login: Authenticates users and returns a JWT.
+   * Key Features:
+       * JWT Middleware: A function (verifyToken) was created to protect routes, ensuring only authenticated
+         users can access them.
+       * ES Module Syntax: Fixed an initial bug by converting the server from CommonJS (require) to ES Module
+         (import) syntax to match the project's package.json configuration.
+
+  ---
+
+  Phase 4: Frontend Authentication UI & Routing
+
+   * Objective: Build the user interface for login and registration and enable navigation.
+   * Technology: React, React Router.
+   * Dependencies Installed:
+       * react-router-dom: For handling client-side routing.
+   * Key Files Created/Modified:
+       * src/components/MessageBox.jsx: A reusable component for displaying success or error messages.
+       * src/components/AgentLoginForm.jsx: The form for agent login.
+       * src/components/AgentRegistrationForm.jsx: The form for agent registration.
+       * src/pages/LoginPage.jsx: The page that hosts the login form.
+       * src/pages/RegisterPage.jsx: The page that hosts the registration form.
+       * src/App.jsx: Overhauled to set up the main application router (<Router>, <Routes>, <Route>).
+   * Actions & Decisions:
+       * Fixed a typo (e.gittarget.value) in the registration form's password field to allow input.
+       * Implemented logic to store the user's JWT in localStorage upon successful login.
+
+  ---
+
+  Phase 5: Agent Dashboard & Protected Routes
+
+   * Objective: Create a secure dashboard area accessible only to logged-in agents, displaying key
+     information.
+   * Key Files Created/Modified:
+       * src/components/ProtectedRoute.jsx: A component that wraps protected routes, redirecting
+         unauthenticated users to the login page.
+       * src/components/WalletTopUpModal.jsx: A modal component for the wallet top-up functionality.
+       * src/pages/DashboardPage.jsx: Initially a placeholder, now the main AgentDashboard component.
+       * server.js: Updated with new protected endpoints.
+       * App.jsx: Updated to include the protected dashboard route and dynamic navigation links
+         (Login/Logout).
+   * API Endpoints Added:
+       * GET /api/wallet: Securely fetches the logged-in user's wallet balance.
+       * GET /api/transactions: Securely fetches a list of recent transactions.
+       * POST /api/wallet/topup: Securely adds funds to a user's wallet and creates a corresponding
+         transaction record.
+   * Key Features:
+       * The dashboard now fetches and displays the agent's wallet balance and recent transactions.
+       * A "Wallet Top-up" button opens a modal to add funds, which updates the database and the UI in
+         real-time.
+
+  ---
+
+  Phase 6: Database Schema Refinement & Recreation
+
+   * Objective: Improve the database schema based on new features and best practices.
+   * Key Files Modified:
+       * schema.sql: Updated with improved constraints and defaults.
+   * Schema Improvements:
+       * Added DEFAULT 'pending' to the kyc_status column in the users table.
+       * Added a proper foreign key constraint between transactions.related_booking_id and bookings.id.
+       * Added ON DELETE CASCADE to foreign keys to ensure that when a user is deleted, their associated data
+         (wallet, transactions, etc.) is also cleanly removed.
+   * Action Taken:
+       * Guided you to drop and recreate the database using the updated schema.sql file to ensure a clean and
+         correct structure.
+
+  This brings us to our current state: a functional application with a solid, authenticated foundation and a
+   core agent dashboard. We are now ready to build out the next feature.

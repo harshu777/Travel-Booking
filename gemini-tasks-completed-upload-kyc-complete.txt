@@ -1,0 +1,143 @@
+Project Overview: B2B Travel Booking Platform
+
+  This is a full-stack web application built with a Node.js/Express backend, a MySQL database, and a React
+  frontend. It serves as a platform for travel agents to book flights and hotels, manage their finances
+  through a wallet system, and for administrators to oversee the platform's operations.
+
+  ---
+
+  1. Database Layer
+
+  The database is the foundation of the application, storing all persistent data.
+
+  1.1. Database Schema & Creation
+
+   * Technology: MySQL
+   * Creation Process: The database schema is built incrementally. To recreate the database, the SQL files
+     must be executed in the following order:
+       1. schema.sql (Establishes the initial tables)
+       2. schema_update_v2.sql (Adds features like refunds and invoices)
+       3. schema_update_v3.sql (Refactors KYC storage into a dedicated table)
+
+  1.2. Table-by-Table Breakdown
+
+   * `users`
+       * Purpose: Stores user account information, roles, and KYC status.
+       * Key Columns:
+           * id: Primary key.
+           * email: Unique identifier for login.
+           * password_hash: Stores user passwords hashed with the bcrypt algorithm. This is a critical
+             security feature.
+           * role: An ENUM('agent', 'admin') to differentiate user permissions.
+           * kyc_status: Tracks the user's KYC verification state.
+
+   * `wallets`
+       * Purpose: Manages the financial balance for each user.
+       * Actions: Debited on booking, credited on top-up or refund.
+
+   * `bookings`
+       * Purpose: Stores records of all flight and hotel bookings.
+       * Key Columns:
+           * pnr: The unique booking reference number.
+           * flight_details / hotel_details: JSON columns to store structured booking data.
+           * refund_status: Tracks the status of any associated refund request.
+
+   * `transactions`
+       * Purpose: A ledger of all financial movements (debits/credits) linked to a user's wallet.
+
+   * `kyc_document`
+       * Purpose: Securely stores user-submitted KYC documents.
+       * Key Columns:
+           * file_data: A MEDIUMBLOB column that stores the binary data of the uploaded file directly in the
+             database.
+           * status: Tracks the admin review status ('pending', 'approved', 'rejected').
+
+   * `refunds`
+       * Purpose: Manages refund requests initiated by agents.
+       * Key Columns:
+           * status: Tracks the admin processing status.
+           * admin_notes: A TEXT field for admins to add notes during refund processing.
+
+   * `commissions` & `invoices`
+       * Purpose: Supporting tables for managing agent commissions and generating booking invoices.
+
+  ---
+
+  2. Backend Layer (`server.js`)
+
+  The backend handles all business logic, API requests, and database interactions.
+
+   * Technology: Node.js with Express.js
+   * Key Libraries:
+       * mysql2/promise: For asynchronous communication with the MySQL database.
+       * bcryptjs: For securely hashing and comparing passwords.
+       * jsonwebtoken: For creating and verifying JWTs for session management.
+       * multer: For handling file uploads (specifically for KYC documents).
+       * puppeteer: For generating PDF e-tickets from HTML.
+
+  2.1. Security and Middleware
+
+   * `verifyToken`: This middleware is applied to all protected routes. It extracts the JWT from the
+     Authorization: Bearer <token> header, verifies its signature, and attaches the user's id and role to the
+     request object for use by downstream handlers.
+   * `verifyAdmin`: This middleware is layered on top of verifyToken for admin-only routes. It checks if the
+     user's role is 'admin' and denies access if not.
+
+  2.2. API Endpoint Modules
+
+   * Authentication (`/api/auth`)
+       * POST /register: Receives name, email, password. Hashes the password using bcrypt.hash() and creates a
+          new user with the 'agent' role.
+       * POST /login: Receives email, password. Finds the user, uses bcrypt.compare() to validate the
+         password, and returns a JWT if successful. (Note: This route currently contains extra `console.log`
+         statements for debugging purposes that should be removed).
+
+   * User Management (`/api/users`)
+       * GET /profile: Fetches the profile of the currently logged-in user.
+       * POST /kyc: A protected endpoint that accepts a file upload. It uses multer to process the file and
+         saves the document details and binary data to the kyc_document table.
+
+   * Admin Actions (`/api/admin`)
+       * A suite of protected endpoints that require admin privileges.
+       * GET /agents: Lists all users with the 'agent' role.
+       * GET /kyc: Retrieves all KYC submissions for admin review.
+       * PUT /kyc/:docId: Updates the status of a KYC submission ('approved' or 'rejected').
+       * GET /refunds: Retrieves all refund requests.
+       * PUT /refunds/:refundId: Processes a refund request, updating its status and adding admin notes.
+
+  ---
+
+  3. Frontend Layer (`src/`)
+
+  The frontend is a single-page application (SPA) that provides the user interface.
+
+   * Technology: React
+   * Key Libraries:
+       * react-router-dom: For handling all client-side routing.
+       * jwt-decode: For decoding JWTs on the client to access payload data like user roles.
+       * tailwindcss: For styling the application.
+
+  3.1. Architecture & State Management
+
+   * Centralized State: The root component, App.jsx, is now the single source of truth for authentication. It
+     holds the userInfo state.
+   * Props-based Data Flow: The login process has been refactored to use a robust, top-down data flow.
+       1. App.jsx defines a function handleLoginSuccess(userData).
+       2. This function is passed as a prop down to LoginPage and then to AgentLoginForm.
+       3. When the login API call is successful, AgentLoginForm calls this function with the user data.
+       4. App.jsx then updates its own state and handles the redirect, ensuring a predictable and reliable user
+           experience.
+   * Previous Flaw: The application previously used window.dispatchEvent to manage login state, which was
+     unreliable and has been removed.
+
+  3.2. Routing (`App.jsx`)
+
+   * Public Routes: /login, /register.
+   * Protected Routes: The application uses wrapper components to protect routes:
+       * `ProtectedRoute`: Checks for a valid JWT in localStorage. If not present, it redirects to /login.
+         Used for agent-level pages like /dashboard.
+       * `AdminRoute`: Performs the same check as ProtectedRoute and also decodes the JWT to ensure the user's
+          role is 'admin'. Used for all routes under /admin/.
+
+  This detailed summary covers the entire project's structure and the recent debugging and refactoring work.
+   You should be able to use this to resume your work in any environment.

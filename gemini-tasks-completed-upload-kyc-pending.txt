@@ -1,0 +1,119 @@
+ Project Overview
+
+  This is a B2B Travel Booking Platform designed for travel agents. It's a full-stack web application built
+  with the MERN stack (PostgreSQL instead of MongoDB) and styled with Tailwind CSS. The platform allows
+  agents to register, manage their profiles, search for and book flights and hotels, manage their bookings,
+  and handle their wallets. It also includes a comprehensive admin dashboard for managing agents, bookings,
+  KYC verification, and more.
+
+  Completed Tasks & Development History
+
+  Based on the project history files, the following major features have been implemented:
+
+   1. User Authentication: A full agent authentication system is in place, including registration, login, and
+      password handling.
+   2. Dashboard & Core Pages: The main agent dashboard and other essential pages like "My Bookings," "Flight
+      Search," and "Hotel Search" have been created.
+   3. Admin Panel: A robust admin dashboard has been developed with modules for:
+       * Agent Management (viewing, approving agents)
+       * KYC Management (reviewing and approving KYC submissions)
+       * Booking Reconciliation
+       * Commission Management
+       * Refund Management
+       * Analytics and Reporting
+       * Support Ticket handling
+   4. Booking & Search:
+       * Flight and Hotel booking forms have been implemented.
+       * Search functionality for flights and hotels is integrated, connected to a mock API.
+   5. Wallet & KYC:
+       * A wallet system for agents has been set up, including a modal for wallet top-ups.
+       * A KYC submission form has been created for agent verification.
+   6. API & Database:
+       * A Node.js/Express server provides the backend API.
+       * The database schema has been created and updated to support all the features mentioned above.
+       * The API is connected to a PostgreSQL database.
+
+  ---
+
+  Frontend Modules (React)
+
+  The frontend is located in the src/ directory and built with React and Vite. It uses React Router for
+  navigation and Tailwind CSS for styling.
+
+  Core Components (`src/components/`):
+
+   * AgentLoginForm.jsx & AgentRegistrationForm.jsx: Handle agent login and registration.
+   * FlightBookingForm.jsx & HotelBookingForm.jsx: Forms for booking flights and hotels.
+   * KycForm.jsx: Allows agents to submit their KYC documents.
+   * WalletTopUpModal.jsx: A modal for agents to add funds to their wallet.
+   * ProtectedRoute.jsx & AdminRoute.jsx: Route guards to protect agent and admin-only pages.
+   * MessageBox.jsx: A reusable component for displaying messages/alerts.
+
+  Admin Components (`src/components/admin/`):
+
+   * AgentManagement.jsx: Interface for admins to view and manage travel agents.
+   * KycManagement.jsx: Interface for admins to review and approve KYC submissions.
+   * BookingReconciliation.jsx, CommissionManagement.jsx, RefundManagement.jsx, AnalyticsReports.jsx,
+     SupportTickets.jsx: Modules for various admin tasks.
+
+  Pages (`src/pages/`):
+
+   * LoginPage.jsx & RegisterPage.jsx: Public-facing pages for authentication.
+   * DashboardPage.jsx: The main dashboard for logged-in agents.
+   * FlightSearchPage.jsx & HotelSearchPage.jsx: Pages for searching flights and hotels.
+   * MyBookingsPage.jsx: Displays a list of the agent's past and upcoming bookings.
+   * AdminDashboard.jsx: The main entry point for all administrative functions, rendering the various admin
+     components.
+
+  ---
+
+  Backend API (Node.js / Express)
+
+  The backend is a single server.js file using Express.js. It connects to a PostgreSQL database using the pg
+   library.
+
+  API Endpoints:
+
+   * Authentication:
+       * POST /api/agents/register: Registers a new agent.
+       * POST /api/agents/login: Logs in an agent and returns a JWT token.
+   * Agent Data:
+       * GET /api/agents/profile: Fetches the profile of the currently logged-in agent.
+   * KYC:
+       * POST /api/kyc: Submits KYC information for an agent.
+       * GET /api/admin/kyc-submissions: (Admin) Fetches all KYC submissions.
+       * PUT /api/admin/kyc-submissions/:id: (Admin) Updates the status of a KYC submission (e.g., approve,
+         reject).
+   * Wallet:
+       * POST /api/wallet/topup: Adds funds to an agent's wallet.
+   * Bookings (Mocked):
+       * GET /api/bookings: Fetches bookings for the logged-in agent.
+       * POST /api/bookings: Creates a new booking.
+   * Search (Mocked):
+       * GET /api/flights/search: Returns mock flight search results.
+       * GET /api/hotels/search: Returns mock hotel search results.
+   * Admin Data:
+       * GET /api/admin/agents: (Admin) Fetches a list of all agents.
+
+  ---
+
+  Database (PostgreSQL)
+
+  The database schema is defined in schema.sql and schema_update_v2.sql.
+
+  Tables:
+
+   * `users`: Stores general user information (might be used for admins or a future user type).
+   * `agents`: Stores information specific to travel agents, including agency_name, contact_person, email,
+     password_hash, status (e.g., pending, approved), and wallet_balance.
+   * `kyc_document`: Stores KYC information linked to an agent (agent_id). Includes document_type,
+     document_number, file_url, and status (e.g., pending, verified).
+   * `bookings`: Stores booking details, linked to an agent (agent_id). Includes booking_type (flight/hotel),
+     booking_details, amount, and status.
+   * `transactions`: Records all financial transactions, linked to an agent's wallet (agent_id). Includes
+     transaction_type (top-up, booking), amount, and status.
+   * `support_tickets`: For managing support requests from agents.
+   * `commissions`: To track commissions earned by agents.
+
+  This summary should serve as a comprehensive snapshot of the project's current state. You can provide this
+   to a new Gemini instance to get it up to speed quickly.
