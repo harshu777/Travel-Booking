@@ -8,6 +8,7 @@ import multer from 'multer';
 import puppeteer from 'puppeteer';
 import nodemailer from 'nodemailer';
 import { body, validationResult } from 'express-validator';
+import { generatePasswordResetEmail } from './emailTemplates.js';
 import crypto from 'crypto';
 import bodyParser from 'body-parser';
 
@@ -34,11 +35,12 @@ const JWT_SECRET = '641732b01d47293b26c0ca00bd8ffec6d29c14f2460bd0210654dfa7f164
 
 // --- Email Transport ---
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
+  host: process.env.BREVO_EMAIL_HOST,
+  port: process.env.BREVO_EMAIL_PORT,
+  secure: process.env.BREVO_EMAIL_SECURE === 'true', // Use 'true' for port 465, 'false' for 587
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    user: process.env.BREVO_EMAIL_USER,
+    pass: process.env.BREVO_SMTP_KEY
   }
 });
 
@@ -305,7 +307,7 @@ app.post('/api/hotels/book', verifyToken, async (req, res) => {
     }
 });
 
-app.get('/api/flights/search', verifyToken, async (req, res) => {
+app.get('/api/flights/search', async (req, res) => {
     // In a real app, you'd use the query params to search a flight database or API.
     // For this demo, we'll return mock data.
     const mockFlights = [
@@ -446,33 +448,52 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
+  console.log(`[Forgot Password] Request received for email: ${email}`);
   try {
     const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
+
     if (users.length === 0) {
+      console.log(`[Forgot Password] User not found for email: ${email}. Sending generic success response.`);
+      // Security measure: Don't reveal if an email is registered or not.
       return res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
     }
+
     const user = users[0];
+    console.log(`[Forgot Password] User found: ${user.email}`);
+
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
     const expirationDate = new Date(Date.now() + 3600000); // 1 hour
+
     await pool.execute(
       'UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?',
       [hashedToken, expirationDate, user.id]
     );
+    console.log(`[Forgot Password] Reset token generated and saved for user: ${user.email}`);
+
     const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: user.email,
       subject: 'Password Reset Request',
-      html: `<p>You are receiving this email because you (or someone else) have requested the reset of the password for your account.</p>
-             <p>Please click on the following link, or paste it into your browser to complete the process:</p>
-             <p><a href="${resetUrl}">${resetUrl}</a></p>
-             <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`
+      html: generatePasswordResetEmail({ resetUrl })
     };
-    await transporter.sendMail(mailOptions);
-    res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
+
+    console.log(`[Forgot Password] Attempting to send email to ${user.email}...`);
+    console.log('[Forgot Password] Mail Options:', mailOptions);
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log('[Forgot Password] Email sent successfully!', info);
+      res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    } catch (emailError) {
+      console.error('[Forgot Password] Error sending email:', emailError);
+      // Even if email fails, we don't want to leak information to the client.
+      // The internal log is what matters for debugging.
+      res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    }
   } catch (error) {
-    console.error('Forgot Password error:', error);
+    console.error('[Forgot Password] General error:', error);
     res.status(500).send({ message: 'An error occurred while processing your request.' });
   }
 });

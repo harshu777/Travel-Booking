@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import MessageBox from '../components/MessageBox';
+import api from '../utils/api';
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
@@ -15,22 +16,10 @@ const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'An error occurred');
-      }
-
-      setMessage(data.message);
-
+      const response = await api.post('/auth/forgot-password', { email });
+      setMessage(response.data.message);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }

@@ -14,6 +14,7 @@ import { jwtDecode } from 'jwt-decode';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import KycDocumentDisplay from './components/admin/KycDocumentDisplay';
+import LandingPage from './pages/LandingPage'; // Import the new LandingPage
 
 function App() {
   const [userInfo, setUserInfo] = useState(null);
@@ -27,6 +28,7 @@ function App() {
         if (decoded.exp * 1000 > Date.now()) {
           setUserInfo({ ...user, role: decoded.role });
         } else {
+          // Token expired, clear it
           localStorage.removeItem('userInfo');
         }
       } catch (e) {
@@ -39,7 +41,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('userInfo');
     setUserInfo(null);
-    navigate('/login');
+    navigate('/login'); // Redirect to login after logout
   };
 
   const handleLoginSuccess = (userData) => {
@@ -47,6 +49,7 @@ function App() {
     const decoded = jwtDecode(userData.accessToken);
     setUserInfo({ ...userData, role: decoded.role });
     
+    // Redirect based on role after login
     if (decoded.role === 'admin') {
       navigate('/admin/dashboard');
     } else {
@@ -57,13 +60,16 @@ function App() {
   return (
     <>
       <Header userInfo={userInfo} onLogout={handleLogout} />
-      <main>
+      <main className="pt-16"> {/* Add padding to main to offset fixed header */}
         <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           
+          {/* Protected Agent Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/search/flights" element={<FlightSearchPage />} />
@@ -71,13 +77,15 @@ function App() {
             <Route path="/my-bookings" element={<MyBookingsPage />} />
           </Route>
 
+          {/* Protected Admin Routes */}
           <Route element={<AdminRoute />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/kyc-document/:userId" element={<KycDocumentDisplay />} />
           </Route>
 
-          <Route path="/" element={
-            <Navigate to={userInfo ? (userInfo.role === 'admin' ? '/admin/dashboard' : '/dashboard') : '/login'} />
+          {/* Fallback redirect if user is logged in and hits a non-existent path */}
+          <Route path="*" element={
+            <Navigate to={userInfo ? (userInfo.role === 'admin' ? '/admin/dashboard' : '/dashboard') : '/'} />
           } />
         </Routes>
       </main>

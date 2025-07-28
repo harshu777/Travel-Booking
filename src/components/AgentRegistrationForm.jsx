@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import MessageBox from './MessageBox';
+import api from '../utils/api'; // Import the api instance
 
 const AgentRegistrationForm = () => {
   const [name, setName] = useState('');
@@ -8,6 +9,7 @@ const AgentRegistrationForm = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false); // Add loading state
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,33 +21,27 @@ const AgentRegistrationForm = () => {
       return;
     }
 
+    setLoading(true); // Set loading to true
     try {
-      const response = await fetch('http://localhost:3001/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
+      // Use the api instance
+      const response = await api.post('/auth/register', { name, email, password });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Handle detailed validation errors from express-validator
-        if (data.errors) {
-          const errorMessages = data.errors.map(err => err.msg).join(' ');
-          throw new Error(errorMessages);
-        }
-        // Handle other generic errors
-        throw new Error(data.message || 'Failed to register');
-      }
-
-      setSuccess('Registration successful! You can now log in.');
+      setSuccess(response.data.message || 'Registration successful! You can now log in.');
       setName('');
       setEmail('');
       setPassword('');
       setConfirmPassword('');
 
     } catch (err) {
-      setError(err.message);
+      // Handle errors from axios, including validation errors
+      if (err.response?.data?.errors) {
+        const errorMessages = err.response.data.errors.map(e => e.msg).join(' ');
+        setError(errorMessages);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Failed to register');
+      }
+    } finally {
+      setLoading(false); // Set loading to false
     }
   };
 
@@ -63,6 +59,7 @@ const AgentRegistrationForm = () => {
             onChange={(e) => setName(e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
             required
+            disabled={loading} // Disable input during loading
           />
         </div>
         <div>
@@ -73,6 +70,7 @@ const AgentRegistrationForm = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
             required
+            disabled={loading} // Disable input during loading
           />
         </div>
         <div>
@@ -83,6 +81,7 @@ const AgentRegistrationForm = () => {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
             required
+            disabled={loading} // Disable input during loading
           />
         </div>
         <div>
@@ -93,10 +92,15 @@ const AgentRegistrationForm = () => {
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
             required
+            disabled={loading} // Disable input during loading
           />
         </div>
-        <button type="submit" className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700">
-          Register
+        <button 
+          type="submit" 
+          className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-blue-400"
+          disabled={loading} // Disable button during loading
+        >
+          {loading ? 'Registering...' : 'Register'}
         </button>
       </form>
     </div>
