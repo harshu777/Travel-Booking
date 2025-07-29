@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import FlightSearchForm from '../components/FlightSearchForm';
 import FlightResults from '../components/FlightResults';
 import MessageBox from '../components/MessageBox';
+import travelImage from '../assets/composition-small-plane-passport-compass-laptop-tickets-grapefruit-plants-leaves.jpg';
 
 const LandingPage = () => {
   const [flightResults, setFlightResults] = useState([]);
@@ -16,15 +17,15 @@ const LandingPage = () => {
 
   return (
     <div 
-      className="min-h-screen"
+      className="min-h-screen bg-cover bg-center"
       style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundImage: `url(${travelImage})`,
         backgroundAttachment: 'fixed'
       }}
     >
       <div className="container mx-auto p-4 relative">
         {/* Background overlay for better readability */}
-        <div className="absolute inset-0 bg-black bg-opacity-10 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-50"></div>
         
         <div className="relative z-10">
           <div className="text-center my-8">

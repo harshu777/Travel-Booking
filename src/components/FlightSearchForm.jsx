@@ -59,15 +59,17 @@ const FlightSearchForm = ({ onSearch, onLoading, onError }) => {
           <label className="text-xs text-gray-500">To</label>
           <input type="text" placeholder="Destination" value={destination} onChange={(e) => setDestination(e.target.value)} className="w-full font-bold text-lg" required />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className={`grid ${tripType === 'round-trip' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
           <div className="border p-2 rounded-lg">
             <label className="text-xs text-gray-500">Departure</label>
             <input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} className="w-full font-bold" required />
           </div>
-          <div className="border p-2 rounded-lg">
-            <label className="text-xs text-gray-500">Return</label>
-            <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full font-bold" disabled={tripType !== 'round-trip'} />
-          </div>
+          {tripType === 'round-trip' && (
+            <div className="border p-2 rounded-lg">
+              <label className="text-xs text-gray-500">Return</label>
+              <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full font-bold" required={tripType === 'round-trip'} />
+            </div>
+          )}
         </div>
         <div className="border p-2 rounded-lg">
           <label className="text-xs text-gray-500">Passengers</label>
