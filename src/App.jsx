@@ -39,9 +39,9 @@ function App() {
   }, []);
 
   const handleLogout = () => {
+    window.location.href = '/'; // Force a full page reload to the landing page
     localStorage.removeItem('userInfo');
     setUserInfo(null);
-    navigate('/login'); // Redirect to login after logout
   };
 
   const handleLoginSuccess = (userData) => {

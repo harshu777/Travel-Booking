@@ -11,7 +11,7 @@ const airlineLogos = {
   'SpiceJet': 'https://imgak.mmtcdn.com/flights/assets/media/dt/common/icons/SG.png?v=17',
 };
 
-const FlightResults = ({ flights, error }) => {
+const FlightResults = ({ flights, error, onSelectFlight }) => {
   const [selectedFlight, setSelectedFlight] = useState(null);
   const navigate = useNavigate();
 
@@ -24,10 +24,11 @@ const FlightResults = ({ flights, error }) => {
     const userInfo = JSON.parse(localStorage.getItem('userInfo'));
     if (!userInfo) {
       // If user is not logged in, redirect them to login page
-      // We can pass the selected flight info in state to return to it after login
-      navigate('/login', { state: { from: '/search/flights', selectedFlightId: flight.id } });
+      // We pass the selected flight info in state to return to it after login
+      navigate('/login', { state: { from: '/search/flights', flightToBook: flight } });
     } else {
-      setSelectedFlight(flight);
+      // If the user is logged in, call the function passed from the parent
+      onSelectFlight(flight);
     }
   };
 

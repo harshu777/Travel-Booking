@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MessageBox from './MessageBox';
 import api from '../utils/api'; // Import the api instance
 
@@ -7,6 +8,8 @@ const AgentLoginForm = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false); // Add loading state
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,6 +23,16 @@ const AgentLoginForm = ({ onLoginSuccess }) => {
       // On successful login, call the callback function passed from App.jsx
       if (onLoginSuccess) {
         onLoginSuccess(response.data);
+      }
+
+      // Check for pre-login state to redirect intelligently
+      const { from, flightToBook } = location.state || {};
+      if (from && flightToBook) {
+        // If user was trying to book a flight, redirect back with the flight data
+        navigate(from, { state: { flightToBook: flightToBook } });
+      } else {
+        // Otherwise, send to the default dashboard
+        navigate('/dashboard');
       }
 
     } catch (err) {

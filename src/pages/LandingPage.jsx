@@ -3,16 +3,23 @@ import FlightSearchForm from '../components/FlightSearchForm';
 import FlightResults from '../components/FlightResults';
 import MessageBox from '../components/MessageBox';
 import travelImage from '../assets/composition-small-plane-passport-compass-laptop-tickets-grapefruit-plants-leaves.jpg';
+import Loader from '../components/Loader';
 
 const LandingPage = () => {
   const [flightResults, setFlightResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [searchPerformed, setSearchPerformed] = useState(false);
 
   const handleSearch = (results) => {
-    setFlightResults(results);
-    setSearchPerformed(true);
+    // Ensure we always have an array
+    setFlightResults(Array.isArray(results) ? results : []);
+  };
+
+  const handleSelectFlight = (flight) => {
+    // On the landing page, the primary action is to encourage login/signup.
+    // The main booking flow is on the dedicated search page.
+    console.log("Flight selected on Landing Page:", flight);
+    alert("Please log in or navigate to the main search page to book flights.");
   };
 
   return (
@@ -47,28 +54,23 @@ const LandingPage = () => {
             </div>
           </div>
 
-          {isLoading && (
-            <div className="text-center p-8">
-              <div className="bg-white bg-opacity-90 rounded-xl p-6 max-w-md mx-auto shadow-lg">
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  <p className="text-gray-700 font-medium">Loading flights...</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {isLoading && <Loader />}
           
           {error && (
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-4xl mx-auto mt-8">
               <MessageBox variant="error">{error}</MessageBox>
             </div>
           )}
 
-          {searchPerformed && !isLoading && (
+          {!isLoading && flightResults.length > 0 && (
             <div className="my-8">
               <div className="bg-white bg-opacity-95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-6xl mx-auto">
                 <h2 className="text-2xl font-bold mb-4 text-gray-800">Search Results</h2>
-                <FlightResults flights={flightResults} error={error} />
+                <FlightResults 
+                  flights={flightResults} 
+                  error={error} 
+                  onSelectFlight={handleSelectFlight} 
+                />
               </div>
             </div>
           )}

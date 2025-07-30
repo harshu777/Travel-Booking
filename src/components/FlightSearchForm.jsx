@@ -164,12 +164,12 @@ const FlightSearchForm = ({ onSearch, onLoading, onError }) => {
           <label className="text-xs text-gray-500">Passengers</label>
           <input type="number" placeholder="Passengers" value={passengers} onChange={(e) => setPassengers(e.target.value)} min="1" className="w-full font-bold text-lg" required />
         </div>
+        <div className="text-center mt-6 col-span-full">
+            <button type="submit" disabled={loading} className="bg-blue-600 text-white font-bold text-lg px-12 py-3 rounded-full hover:bg-blue-700 transition-colors">
+              {loading ? 'Searching...' : 'SEARCH'}
+            </button>
+        </div>
       </form>
-      <div className="text-center mt-6">
-        <button type="submit" onClick={handleSearch} disabled={loading} className="bg-blue-600 text-white font-bold text-lg px-12 py-3 rounded-full hover:bg-blue-700 transition-colors">
-          {loading ? 'Searching...' : 'SEARCH'}
-        </button>
-      </div>
     </div>
   );
 };

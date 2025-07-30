@@ -3,47 +3,52 @@ import { Link, useLocation } from 'react-router-dom';
 import { FaPlane, FaHotel } from 'react-icons/fa';
 import FlightSearchForm from '../components/FlightSearchForm';
 import FlightResults from '../components/FlightResults';
+import FlightBookingForm from '../components/FlightBookingForm'; // Import the booking form
 import MessageBox from '../components/MessageBox';
+import Loader from '../components/Loader'; // Import the new Loader
 import api from '../utils/api';
 
 const FlightSearchPage = () => {
   const [flightResults, setFlightResults] = useState([]);
+  const [selectedFlight, setSelectedFlight] = useState(null); // State to hold a flight for direct booking
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchPerformed, setSearchPerformed] = useState(false);
   const location = useLocation();
 
-  // This effect runs when the component loads, specifically to handle
-  // the redirect from the login page.
+  // This effect runs when the component loads to handle a direct booking redirect
   useEffect(() => {
-    const { selectedFlightId } = location.state || {};
-    if (selectedFlightId) {
-      // If we have a flight ID, we need to fetch all flights again
-      // to find the one the user wanted to book.
-      setIsLoading(true);
-      api.get('/flights/search') // Fetch all mock flights
-        .then(response => {
-          const allFlights = response.data;
-          const selected = allFlights.find(f => f.id === selectedFlightId);
-          if (selected) {
-            // We set the results to just the selected flight to show the booking form.
-            setFlightResults([selected]);
-            setSearchPerformed(true);
-          }
-        })
-        .catch(err => setError(err.message))
-        .finally(() => setIsLoading(false));
+    const { flightToBook } = location.state || {};
+    if (flightToBook) {
+      // If we have a flight object in the state, the user was redirected from login.
+      // Set this flight as the selected one to directly show the booking form.
+      setSelectedFlight(flightToBook);
+      setSearchPerformed(true); // Mark search as "performed" to show the content area
     }
   }, [location.state]);
 
 
   const handleSearch = (results) => {
     setFlightResults(results);
+    setSelectedFlight(null); // Clear any previously selected flight on a new search
     setSearchPerformed(true);
+  };
+
+  const handleBookingSuccess = () => {
+    setSelectedFlight(null); // Clear the selected flight
+    setFlightResults([]); // Clear search results
+    setSearchPerformed(false); // Reset the search state
+    // Optionally, you could show a success message here or navigate to "My Bookings"
+  };
+
+  // This function will be passed to FlightResults to set the selected flight
+  const handleSelectFlight = (flight) => {
+    setSelectedFlight(flight);
   };
 
   return (
     <div className="bg-gray-100 min-h-screen">
+      {isLoading && <Loader />}
       <div className="bg-blue-600">
         <div className="container mx-auto px-4 pt-4">
           {/* Service Tabs */}
@@ -72,12 +77,25 @@ const FlightSearchPage = () => {
       </div>
 
       <div className="container mx-auto p-4 md:p-8">
-        {isLoading && <div className="text-center p-8"><p>Loading flights...</p></div>}
         
         {error && <MessageBox variant="error">{error}</MessageBox>}
 
         {searchPerformed && !isLoading && (
-           <FlightResults flights={flightResults} error={error} />
+          <>
+            {selectedFlight ? (
+              <FlightBookingForm 
+                flight={selectedFlight} 
+                onBookingSuccess={handleBookingSuccess}
+                onCancel={() => setSelectedFlight(null)} // Allow canceling the booking view
+              />
+            ) : (
+              <FlightResults 
+                flights={flightResults} 
+                error={error} 
+                onSelectFlight={handleSelectFlight} // Pass the handler down
+              />
+            )}
+          </>
         )}
       </div>
     </div>
