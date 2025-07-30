@@ -1,0 +1,63 @@
+# .github/workflows/ci.yml
+
+name: Node.js CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  # Triggers the workflow on pull request events targeting the "main" branch
+  pull_request:
+    branches: [ "main" ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This job is named "build-and-test"
+  build-and-test:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # 1. Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Sets up a specific version of Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' # Using a Long-Term Support (LTS) version of Node.js
+          cache: 'npm'   # Caches npm dependencies for faster builds
+
+      # 3. Installs the project dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 4. Runs the build script to create a production build of the frontend
+      #    This step is crucial to ensure the application compiles correctly.
+      - name: Build application
+        run: npm run build
+        # We need to provide the environment variables required for the build process
+        env:
+          CI: false # Treats warnings as errors, common to disable in CI for non-critical warnings
+          # Add any build-time environment variables here if needed in the future
+
+      # 5. Runs the test suite defined in your package.json
+      - name: Run tests
+        run: npm test
+        # Provide the necessary environment variables for the tests to run
+        # These will be read from GitHub Secrets
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          BREVO_EMAIL_HOST: ${{ secrets.BREVO_EMAIL_HOST }}
+          BREVO_EMAIL_PORT: ${{ secrets.BREVO_EMAIL_PORT }}
+          BREVO_EMAIL_SECURE: ${{ secrets.BREVO_EMAIL_SECURE }}
+          BREVO_EMAIL_USER: ${{ secrets.BREVO_EMAIL_USER }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}

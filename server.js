@@ -54,7 +54,7 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_DATABASE || 'b2b_travel_booking_platform'
 };
-const JWT_SECRET = '641732b01d47293b26c0ca00bd8ffec6d29c14f2460bd0210654dfa7f164ff027fa314d56755794de99b8602e68217cc4eea94f1540de11270efb7bfb2fb7b4e';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // --- Email Transport ---
 const transporter = nodemailer.createTransport({
@@ -452,9 +452,18 @@ app.post(
   }
 );
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login',
+  [
+    body('email', 'Please include a valid email').isEmail().normalizeEmail(),
+    body('password', 'Password is required').not().isEmpty()
+  ],
+  async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).send({ message: 'Please provide email and password.' });
   try {
     const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
     if (rows.length === 0) {
