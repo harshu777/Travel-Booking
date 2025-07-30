@@ -85,6 +85,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           # The script that will be run on your server
           script: |
+            # Source NVM to make node, npm, and pm2 available
+            source ~/.nvm/nvm.sh
+            
             # Navigate to the project directory on your server
             cd ${{ secrets.PROJECT_PATH }}
             
