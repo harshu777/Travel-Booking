@@ -70,6 +70,13 @@ const transporter = nodemailer.createTransport({
 // --- Database Connection Pool ---
 const pool = mysql.createPool(dbConfig);
 
+// --- Amadeus API Client ---
+import Amadeus from 'amadeus';
+const amadeus = new Amadeus({
+  clientId: process.env.AMADEUS_API_KEY,
+  clientSecret: process.env.AMADEUS_API_SECRET
+});
+
 // --- JWT Verification Middleware ---
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -94,6 +101,34 @@ const verifyAdmin = (req, res, next) => {
   }
   next();
 };
+
+// --- Location Search API Route (for auto-suggest) ---
+app.get('/api/locations/search', async (req, res) => {
+  const { keyword } = req.query;
+  if (!keyword) {
+    return res.status(400).json({ message: 'Keyword is required.' });
+  }
+
+  try {
+    const response = await amadeus.referenceData.locations.get({
+      keyword: keyword,
+      subType: Amadeus.location.any, // Search for both cities and airports
+    });
+
+    // Map the response to a simpler format for the frontend
+    const locations = response.data.map(location => ({
+      name: `${location.name} (${location.iataCode})`,
+      iataCode: location.iataCode,
+      subType: location.subType, // 'CITY' or 'AIRPORT'
+      countryCode: location.address.countryCode,
+    }));
+
+    res.json(locations);
+  } catch (error) {
+    console.error('Amadeus Location Search Error:', error.response ? error.response.data : error.message);
+    res.status(500).json({ message: 'Failed to fetch locations.', error: error.response?.data });
+  }
+});
 
 
 
@@ -311,44 +346,52 @@ app.post('/api/hotels/book', verifyToken, async (req, res) => {
 });
 
 app.get('/api/flights/search', async (req, res) => {
-    const { origin, destination, tripType } = req.query;
+    const { origin, destination, departureDate, tripType, passengers } = req.query;
 
-    // In a real app, you'd use the query params to search a flight database or API.
-    // For this demo, we'll filter mock data.
-    const mockFlights = [
-        // Existing mock data...
-        { id: 1, airline: 'IndiGo', flightNumber: '6E 204', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T08:00:00', arrival: '2024-08-01T10:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4500, currency: 'INR' },
-        { id: 2, airline: 'Vistara', flightNumber: 'UK 996', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T09:30:00', arrival: '2024-08-01T11:35:00', duration: '2h 5m', stops: 'Non-stop', price: 5200, currency: 'INR' },
-        { id: 3, airline: 'Air India', flightNumber: 'AI 805', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T11:00:00', arrival: '2024-08-01T13:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4800, currency: 'INR' },
-        { id: 4, airline: 'SpiceJet', flightNumber: 'SG 871', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T14:00:00', arrival: '2024-08-01T16:15:00', duration: '2h 15m', stops: 'Non-stop', price: 4300, currency: 'INR' },
-        { id: 5, airline: 'IndiGo', flightNumber: '6E 555', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T16:30:00', arrival: '2024-08-01T18:30:00', duration: '2h 0m', stops: 'Non-stop', price: 4650, currency: 'INR' },
-        { id: 6, airline: 'Vistara', flightNumber: 'UK 951', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T18:00:00', arrival: '2024-08-01T20:10:00', duration: '2h 10m', stops: 'Non-stop', price: 5500, currency: 'INR' },
-        { id: 7, airline: 'Air India', flightNumber: 'AI 665', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T20:30:00', arrival: '2024-08-01T22:30:00', duration: '2h 0m', stops: 'Non-stop', price: 5100, currency: 'INR' },
-        { id: 8, airline: 'IndiGo', flightNumber: '6E 2041', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T06:00:00', arrival: '2024-08-01T09:15:00', duration: '3h 15m', stops: '1 Stop', price: 6200, currency: 'INR' },
-        { id: 9, airline: 'Vistara', flightNumber: 'UK 888', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T12:00:00', arrival: '2024-08-01T16:00:00', duration: '4h 0m', stops: '1 Stop', price: 5800, currency: 'INR' },
-        // Return flights (BOM to DEL)
-        { id: 10, airline: 'IndiGo', flightNumber: '6E 205', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T08:00:00', arrival: '2024-08-08T10:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4700, currency: 'INR' },
-        { id: 11, airline: 'Vistara', flightNumber: 'UK 997', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T09:30:00', arrival: '2024-08-08T11:35:00', duration: '2h 5m', stops: 'Non-stop', price: 5400, currency: 'INR' },
-        { id: 12, airline: 'Air India', flightNumber: 'AI 806', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T11:00:00', arrival: '2024-08-08T13:00:00', duration: '2h 0m', stops: 'Non-stop', price: 5000, currency: 'INR' },
-        { id: 13, airline: 'IndiGo', flightNumber: '6E 2042', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T06:00:00', arrival: '2024-08-08T09:15:00', duration: '3h 15m', stops: '1 Stop', price: 6400, currency: 'INR' },
-    ];
-
-    // Case-insensitive filtering
-    const outboundFlights = mockFlights.filter(
-        f => f.origin.toLowerCase() === origin.toLowerCase() && f.destination.toLowerCase() === destination.toLowerCase()
-    );
-
-    let returnFlights = [];
-    if (tripType === 'round-trip') {
-        returnFlights = mockFlights.filter(
-            f => f.origin.toLowerCase() === destination.toLowerCase() && f.destination.toLowerCase() === origin.toLowerCase()
-        );
+    if (!origin || !destination || !departureDate) {
+        return res.status(400).json({ message: 'Origin, Destination, and Departure Date are required.' });
     }
 
-    res.json({
-        outboundFlights,
-        returnFlights
-    });
+    try {
+        const response = await amadeus.shopping.flightOffersSearch.get({
+            originLocationCode: origin,
+            destinationLocationCode: destination,
+            departureDate: departureDate,
+            adults: passengers || '1',
+            currencyCode: 'INR',
+            max: 25 // Limit the number of results
+        });
+
+        // Map the Amadeus response to the format our frontend expects
+        const outboundFlights = response.data.map(offer => {
+            const itinerary = offer.itineraries[0]; // Assuming one itinerary for simplicity
+            const segment = itinerary.segments[0]; // Assuming one segment for simplicity
+
+            return {
+                id: offer.id,
+                airline: segment.carrierCode, // This will be an IATA code like '6E'
+                flightNumber: `${segment.carrierCode} ${segment.number}`,
+                origin: segment.departure.iataCode,
+                destination: segment.arrival.iataCode,
+                departure: segment.departure.at,
+                arrival: segment.arrival.at,
+                duration: itinerary.duration.replace('PT', '').replace('H', 'h ').replace('M', 'm'),
+                stops: `${itinerary.segments.length - 1} Stop(s)`,
+                price: parseFloat(offer.price.total),
+                currency: offer.price.currency,
+            };
+        });
+        
+        // For now, we'll return an empty array for return flights as the logic is more complex
+        res.json({
+            outboundFlights,
+            returnFlights: [] 
+        });
+
+    } catch (error) {
+        console.error('Amadeus API Error:', error.response ? error.response.data : error.message);
+        res.status(500).json({ message: 'Failed to fetch flights from provider.', error: error.response?.data });
+    }
 });
 
 app.post('/api/flights/book', verifyToken, async (req, res) => {
