@@ -61,3 +61,42 @@ jobs:
           BREVO_EMAIL_USER: ${{ secrets.BREVO_EMAIL_USER }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+  # This is the new job for Continuous Deployment
+  deploy:
+    # This job will only run on the ubuntu-latest runner
+    runs-on: ubuntu-latest
+    
+    # This ensures the deploy job only runs after the build-and-test job has succeeded
+    needs: build-and-test
+    
+    # This condition ensures that deployment only happens on a push to the main branch,
+    # not on pull requests.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # Steps to deploy the application
+    steps:
+      - name: Deploy to server
+        # This popular action handles the SSH connection and command execution
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # The script that will be run on your server
+          script: |
+            # Navigate to the project directory on your server
+            cd ${{ secrets.PROJECT_PATH }}
+            
+            # Pull the latest changes from the main branch
+            git pull origin main
+            
+            # Install any new dependencies
+            npm install
+            
+            # Build the frontend application for production
+            npm run build
+            
+            # Restart the application using PM2 to apply the changes
+            # Replace 'b2b-app' with the name you gave your app in PM2
+            pm2 restart b2b-app
