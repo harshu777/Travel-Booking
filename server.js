@@ -73,7 +73,6 @@ const pool = mysql.createPool(dbConfig);
 // --- JWT Verification Middleware ---
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
-  console.log('Token:', token);
   if (!token) {
     return res.status(403).send({ message: 'No token provided.' });
   }
@@ -82,7 +81,6 @@ const verifyToken = (req, res, next) => {
       console.error('JWT Error:', err);
       return res.status(401).send({ message: 'Unauthorized: Invalid Token.' });
     }
-    console.log('Decoded Token:', decoded);
     req.userId = decoded.id;
     req.userRole = decoded.role;
     next();
@@ -91,31 +89,13 @@ const verifyToken = (req, res, next) => {
 
 // --- Admin Verification Middleware ---
 const verifyAdmin = (req, res, next) => {
-  console.log('User Role:', req.userRole);
   if (req.userRole !== 'admin') {
     return res.status(403).send({ message: "Forbidden: Requires Admin Role!" });
   }
   next();
 };
 
-// --- Temporary Test Endpoint ---
-app.get('/api/test-balance/:id', async (req, res) => {
-    const { id } = req.params;
-    console.log(`[Test API] Received request for user ID: ${id}`);
-    try {
-        const [rows] = await pool.execute('SELECT wallet_balance, name, email FROM users WHERE id = ?', [id]);
-        if (rows.length > 0) {
-            console.log(`[Test API] Database returned:`, rows[0]);
-            res.json({ message: 'Test successful', data: rows[0] });
-        } else {
-            console.log(`[Test API] User not found for ID: ${id}`);
-            res.status(404).json({ message: 'Test failed: User not found' });
-        }
-    } catch (error) {
-        console.error('[Test API] Error:', error);
-        res.status(500).json({ message: 'Test failed: Server error' });
-    }
-});
+
 
 // --- User API Routes ---
 app.get('/api/users/profile', verifyToken, async (req, res) => {
@@ -331,9 +311,12 @@ app.post('/api/hotels/book', verifyToken, async (req, res) => {
 });
 
 app.get('/api/flights/search', async (req, res) => {
+    const { origin, destination, tripType } = req.query;
+
     // In a real app, you'd use the query params to search a flight database or API.
-    // For this demo, we'll return mock data.
+    // For this demo, we'll filter mock data.
     const mockFlights = [
+        // Existing mock data...
         { id: 1, airline: 'IndiGo', flightNumber: '6E 204', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T08:00:00', arrival: '2024-08-01T10:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4500, currency: 'INR' },
         { id: 2, airline: 'Vistara', flightNumber: 'UK 996', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T09:30:00', arrival: '2024-08-01T11:35:00', duration: '2h 5m', stops: 'Non-stop', price: 5200, currency: 'INR' },
         { id: 3, airline: 'Air India', flightNumber: 'AI 805', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T11:00:00', arrival: '2024-08-01T13:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4800, currency: 'INR' },
@@ -343,8 +326,29 @@ app.get('/api/flights/search', async (req, res) => {
         { id: 7, airline: 'Air India', flightNumber: 'AI 665', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T20:30:00', arrival: '2024-08-01T22:30:00', duration: '2h 0m', stops: 'Non-stop', price: 5100, currency: 'INR' },
         { id: 8, airline: 'IndiGo', flightNumber: '6E 2041', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T06:00:00', arrival: '2024-08-01T09:15:00', duration: '3h 15m', stops: '1 Stop', price: 6200, currency: 'INR' },
         { id: 9, airline: 'Vistara', flightNumber: 'UK 888', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T12:00:00', arrival: '2024-08-01T16:00:00', duration: '4h 0m', stops: '1 Stop', price: 5800, currency: 'INR' },
+        // Return flights (BOM to DEL)
+        { id: 10, airline: 'IndiGo', flightNumber: '6E 205', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T08:00:00', arrival: '2024-08-08T10:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4700, currency: 'INR' },
+        { id: 11, airline: 'Vistara', flightNumber: 'UK 997', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T09:30:00', arrival: '2024-08-08T11:35:00', duration: '2h 5m', stops: 'Non-stop', price: 5400, currency: 'INR' },
+        { id: 12, airline: 'Air India', flightNumber: 'AI 806', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T11:00:00', arrival: '2024-08-08T13:00:00', duration: '2h 0m', stops: 'Non-stop', price: 5000, currency: 'INR' },
+        { id: 13, airline: 'IndiGo', flightNumber: '6E 2042', origin: 'BOM', destination: 'DEL', departure: '2024-08-08T06:00:00', arrival: '2024-08-08T09:15:00', duration: '3h 15m', stops: '1 Stop', price: 6400, currency: 'INR' },
     ];
-    res.json(mockFlights);
+
+    // Case-insensitive filtering
+    const outboundFlights = mockFlights.filter(
+        f => f.origin.toLowerCase() === origin.toLowerCase() && f.destination.toLowerCase() === destination.toLowerCase()
+    );
+
+    let returnFlights = [];
+    if (tripType === 'round-trip') {
+        returnFlights = mockFlights.filter(
+            f => f.origin.toLowerCase() === destination.toLowerCase() && f.destination.toLowerCase() === origin.toLowerCase()
+        );
+    }
+
+    res.json({
+        outboundFlights,
+        returnFlights
+    });
 });
 
 app.post('/api/flights/book', verifyToken, async (req, res) => {
@@ -471,18 +475,15 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
-  console.log(`[Forgot Password] Request received for email: ${email}`);
   try {
     const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
 
     if (users.length === 0) {
-      console.log(`[Forgot Password] User not found for email: ${email}. Sending generic success response.`);
       // Security measure: Don't reveal if an email is registered or not.
       return res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
     }
 
     const user = users[0];
-    console.log(`[Forgot Password] User found: ${user.email}`);
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
@@ -492,7 +493,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       'UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?',
       [hashedToken, expirationDate, user.id]
     );
-    console.log(`[Forgot Password] Reset token generated and saved for user: ${user.email}`);
 
     const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
     const mailOptions = {
@@ -502,12 +502,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       html: generatePasswordResetEmail({ resetUrl })
     };
 
-    console.log(`[Forgot Password] Attempting to send email to ${user.email}...`);
-    console.log('[Forgot Password] Mail Options:', mailOptions);
-
     try {
       const info = await transporter.sendMail(mailOptions);
-      console.log('[Forgot Password] Email sent successfully!', info);
       res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
     } catch (emailError) {
       console.error('[Forgot Password] Error sending email:', emailError);
