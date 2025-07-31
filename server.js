@@ -8,7 +8,6 @@ import multer from 'multer';
 import puppeteer from 'puppeteer';
 import nodemailer from 'nodemailer';
 import { body, validationResult } from 'express-validator';
-import { generatePasswordResetEmail } from './emailTemplates.js';
 import crypto from 'crypto';
 import bodyParser from 'body-parser';
 
@@ -16,70 +15,40 @@ const app = express();
 const port = 3001;
 
 // --- Middleware ---
-// Set up CORS to allow specific origins
-const allowedOrigins = [
-  'http://localhost:5173', // Vite dev server
-  'http://localhost:4173', // Vite preview server
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    // Allow ngrok subdomains
-    if (/\.ngrok-free\.app$/.test(origin)) {
-      return callback(null, true);
-    }
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  }
-}));
-
+app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // --- Multer Configuration ---
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-
+// b2b_user
 // --- Database Configuration ---
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_DATABASE || 'b2b_travel_booking_platform'
+  host: 'localhost',
+  user: 'root',
+  password: '', // Your MySQL password
+  database: 'b2b_travel_booking_platform'
 };
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = '641732b01d47293b26c0ca00bd8ffec6d29c14f2460bd0210654dfa7f164ff027fa314d56755794de99b8602e68217cc4eea94f1540de11270efb7bfb2fb7b4e';
 
 // --- Email Transport ---
 const transporter = nodemailer.createTransport({
-  host: process.env.BREVO_EMAIL_HOST,
-  port: process.env.BREVO_EMAIL_PORT,
-  secure: process.env.BREVO_EMAIL_SECURE === 'true', // Use 'true' for port 465, 'false' for 587
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
   auth: {
-    user: process.env.BREVO_EMAIL_USER,
-    pass: process.env.BREVO_SMTP_KEY
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 });
 
 // --- Database Connection Pool ---
 const pool = mysql.createPool(dbConfig);
 
-// --- Amadeus API Client ---
-import Amadeus from 'amadeus';
-const amadeus = new Amadeus({
-  clientId: process.env.AMADEUS_API_KEY,
-  clientSecret: process.env.AMADEUS_API_SECRET
-});
-
 // --- JWT Verification Middleware ---
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
+  console.log('Token:', token);
   if (!token) {
     return res.status(403).send({ message: 'No token provided.' });
   }
@@ -88,6 +57,7 @@ const verifyToken = (req, res, next) => {
       console.error('JWT Error:', err);
       return res.status(401).send({ message: 'Unauthorized: Invalid Token.' });
     }
+    console.log('Decoded Token:', decoded);
     req.userId = decoded.id;
     req.userRole = decoded.role;
     next();
@@ -96,41 +66,31 @@ const verifyToken = (req, res, next) => {
 
 // --- Admin Verification Middleware ---
 const verifyAdmin = (req, res, next) => {
+  console.log('User Role:', req.userRole);
   if (req.userRole !== 'admin') {
     return res.status(403).send({ message: "Forbidden: Requires Admin Role!" });
   }
   next();
 };
 
-// --- Location Search API Route (for auto-suggest) ---
-app.get('/api/locations/search', async (req, res) => {
-  const { keyword } = req.query;
-  if (!keyword) {
-    return res.status(400).json({ message: 'Keyword is required.' });
-  }
-
-  try {
-    const response = await amadeus.referenceData.locations.get({
-      keyword: keyword,
-      subType: Amadeus.location.any, // Search for both cities and airports
-    });
-
-    // Map the response to a simpler format for the frontend
-    const locations = response.data.map(location => ({
-      name: `${location.name} (${location.iataCode})`,
-      iataCode: location.iataCode,
-      subType: location.subType, // 'CITY' or 'AIRPORT'
-      countryCode: location.address.countryCode,
-    }));
-
-    res.json(locations);
-  } catch (error) {
-    console.error('Amadeus Location Search Error:', error.response ? error.response.data : error.message);
-    res.status(500).json({ message: 'Failed to fetch locations.', error: error.response?.data });
-  }
+// --- Temporary Test Endpoint ---
+app.get('/api/test-balance/:id', async (req, res) => {
+    const { id } = req.params;
+    console.log(`[Test API] Received request for user ID: ${id}`);
+    try {
+        const [rows] = await pool.execute('SELECT wallet_balance, name, email FROM users WHERE id = ?', [id]);
+        if (rows.length > 0) {
+            console.log(`[Test API] Database returned:`, rows[0]);
+            res.json({ message: 'Test successful', data: rows[0] });
+        } else {
+            console.log(`[Test API] User not found for ID: ${id}`);
+            res.status(404).json({ message: 'Test failed: User not found' });
+        }
+    } catch (error) {
+        console.error('[Test API] Error:', error);
+        res.status(500).json({ message: 'Test failed: Server error' });
+    }
 });
-
-
 
 // --- User API Routes ---
 app.get('/api/users/profile', verifyToken, async (req, res) => {
@@ -345,53 +305,21 @@ app.post('/api/hotels/book', verifyToken, async (req, res) => {
     }
 });
 
-app.get('/api/flights/search', async (req, res) => {
-    const { origin, destination, departureDate, tripType, passengers } = req.query;
-
-    if (!origin || !destination || !departureDate) {
-        return res.status(400).json({ message: 'Origin, Destination, and Departure Date are required.' });
-    }
-
-    try {
-        const response = await amadeus.shopping.flightOffersSearch.get({
-            originLocationCode: origin,
-            destinationLocationCode: destination,
-            departureDate: departureDate,
-            adults: passengers || '1',
-            currencyCode: 'INR',
-            max: 25 // Limit the number of results
-        });
-
-        // Map the Amadeus response to the format our frontend expects
-        const outboundFlights = response.data.map(offer => {
-            const itinerary = offer.itineraries[0]; // Assuming one itinerary for simplicity
-            const segment = itinerary.segments[0]; // Assuming one segment for simplicity
-
-            return {
-                id: offer.id,
-                airline: segment.carrierCode, // This will be an IATA code like '6E'
-                flightNumber: `${segment.carrierCode} ${segment.number}`,
-                origin: segment.departure.iataCode,
-                destination: segment.arrival.iataCode,
-                departure: segment.departure.at,
-                arrival: segment.arrival.at,
-                duration: itinerary.duration.replace('PT', '').replace('H', 'h ').replace('M', 'm'),
-                stops: `${itinerary.segments.length - 1} Stop(s)`,
-                price: parseFloat(offer.price.total),
-                currency: offer.price.currency,
-            };
-        });
-        
-        // For now, we'll return an empty array for return flights as the logic is more complex
-        res.json({
-            outboundFlights,
-            returnFlights: [] 
-        });
-
-    } catch (error) {
-        console.error('Amadeus API Error:', error.response ? error.response.data : error.message);
-        res.status(500).json({ message: 'Failed to fetch flights from provider.', error: error.response?.data });
-    }
+app.get('/api/flights/search', verifyToken, async (req, res) => {
+    // In a real app, you'd use the query params to search a flight database or API.
+    // For this demo, we'll return mock data.
+    const mockFlights = [
+        { id: 1, airline: 'IndiGo', flightNumber: '6E 204', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T08:00:00', arrival: '2024-08-01T10:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4500, currency: 'INR' },
+        { id: 2, airline: 'Vistara', flightNumber: 'UK 996', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T09:30:00', arrival: '2024-08-01T11:35:00', duration: '2h 5m', stops: 'Non-stop', price: 5200, currency: 'INR' },
+        { id: 3, airline: 'Air India', flightNumber: 'AI 805', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T11:00:00', arrival: '2024-08-01T13:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4800, currency: 'INR' },
+        { id: 4, airline: 'SpiceJet', flightNumber: 'SG 871', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T14:00:00', arrival: '2024-08-01T16:15:00', duration: '2h 15m', stops: 'Non-stop', price: 4300, currency: 'INR' },
+        { id: 5, airline: 'IndiGo', flightNumber: '6E 555', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T16:30:00', arrival: '2024-08-01T18:30:00', duration: '2h 0m', stops: 'Non-stop', price: 4650, currency: 'INR' },
+        { id: 6, airline: 'Vistara', flightNumber: 'UK 951', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T18:00:00', arrival: '2024-08-01T20:10:00', duration: '2h 10m', stops: 'Non-stop', price: 5500, currency: 'INR' },
+        { id: 7, airline: 'Air India', flightNumber: 'AI 665', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T20:30:00', arrival: '2024-08-01T22:30:00', duration: '2h 0m', stops: 'Non-stop', price: 5100, currency: 'INR' },
+        { id: 8, airline: 'IndiGo', flightNumber: '6E 2041', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T06:00:00', arrival: '2024-08-01T09:15:00', duration: '3h 15m', stops: '1 Stop', price: 6200, currency: 'INR' },
+        { id: 9, airline: 'Vistara', flightNumber: 'UK 888', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T12:00:00', arrival: '2024-08-01T16:00:00', duration: '4h 0m', stops: '1 Stop', price: 5800, currency: 'INR' },
+    ];
+    res.json(mockFlights);
 });
 
 app.post('/api/flights/book', verifyToken, async (req, res) => {
@@ -495,18 +423,9 @@ app.post(
   }
 );
 
-app.post('/api/auth/login',
-  [
-    body('email', 'Please include a valid email').isEmail().normalizeEmail(),
-    body('password', 'Password is required').not().isEmpty()
-  ],
-  async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) return res.status(400).send({ message: 'Please provide email and password.' });
   try {
     const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
     if (rows.length === 0) {
@@ -529,42 +448,31 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
   try {
     const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
-
     if (users.length === 0) {
-      // Security measure: Don't reveal if an email is registered or not.
       return res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
     }
-
     const user = users[0];
-
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
     const expirationDate = new Date(Date.now() + 3600000); // 1 hour
-
     await pool.execute(
       'UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?',
       [hashedToken, expirationDate, user.id]
     );
-
     const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: user.email,
       subject: 'Password Reset Request',
-      html: generatePasswordResetEmail({ resetUrl })
+      html: `<p>You are receiving this email because you (or someone else) have requested the reset of the password for your account.</p>
+             <p>Please click on the following link, or paste it into your browser to complete the process:</p>
+             <p><a href="${resetUrl}">${resetUrl}</a></p>
+             <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`
     };
-
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
-    } catch (emailError) {
-      console.error('[Forgot Password] Error sending email:', emailError);
-      // Even if email fails, we don't want to leak information to the client.
-      // The internal log is what matters for debugging.
-      res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
-    }
+    await transporter.sendMail(mailOptions);
+    res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
   } catch (error) {
-    console.error('[Forgot Password] General error:', error);
+    console.error('Forgot Password error:', error);
     res.status(500).send({ message: 'An error occurred while processing your request.' });
   }
 });
