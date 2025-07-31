@@ -102,4 +102,6 @@ jobs:
             
             # Restart the application using PM2 to apply the changes
             # Replace 'b2b-app' with the name you gave your app in PM2
-            pm2 restart b2b-app
+            pm2 stop b2b-app
+            pm2 start server.js --name b2b-app
+    
