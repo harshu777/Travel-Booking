@@ -8,7 +8,6 @@ import multer from 'multer';
 import puppeteer from 'puppeteer';
 import nodemailer from 'nodemailer';
 import { body, validationResult } from 'express-validator';
-import { generatePasswordResetEmail } from './emailTemplates.js';
 import crypto from 'crypto';
 import bodyParser from 'body-parser';
 
@@ -16,121 +15,82 @@ const app = express();
 const port = 3001;
 
 // --- Middleware ---
-// Set up CORS to allow specific origins
-const allowedOrigins = [
-  'http://localhost:5173', // Vite dev server
-  'http://localhost:4173', // Vite preview server
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    // Allow ngrok subdomains
-    if (/\.ngrok-free\.app$/.test(origin)) {
-      return callback(null, true);
-    }
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  }
-}));
-
+app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // --- Multer Configuration ---
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-
+// b2b_user
 // --- Database Configuration ---
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_DATABASE || 'b2b_travel_booking_platform'
+    host: 'localhost',
+    user: 'root',
+    password: '', // Your MySQL password
+    database: 'b2b_travel_booking_platform'
 };
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = '641732b01d47293b26c0ca00bd8ffec6d29c14f2460bd0210654dfa7f164ff027fa314d56755794de99b8602e68217cc4eea94f1540de11270efb7bfb2fb7b4e';
 
 // --- Email Transport ---
 const transporter = nodemailer.createTransport({
-  host: process.env.BREVO_EMAIL_HOST,
-  port: process.env.BREVO_EMAIL_PORT,
-  secure: process.env.BREVO_EMAIL_SECURE === 'true', // Use 'true' for port 465, 'false' for 587
-  auth: {
-    user: process.env.BREVO_EMAIL_USER,
-    pass: process.env.BREVO_SMTP_KEY
-  }
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT,
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
 });
 
 // --- Database Connection Pool ---
 const pool = mysql.createPool(dbConfig);
 
-// --- Amadeus API Client ---
-import Amadeus from 'amadeus';
-const amadeus = new Amadeus({
-  clientId: process.env.AMADEUS_API_KEY,
-  clientSecret: process.env.AMADEUS_API_SECRET
-});
-
 // --- JWT Verification Middleware ---
 const verifyToken = (req, res, next) => {
-  const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) {
-    return res.status(403).send({ message: 'No token provided.' });
-  }
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      console.error('JWT Error:', err);
-      return res.status(401).send({ message: 'Unauthorized: Invalid Token.' });
+    const token = req.headers['authorization']?.split(' ')[1];
+    console.log('Token:', token);
+    if (!token) {
+        return res.status(403).send({ message: 'No token provided.' });
     }
-    req.userId = decoded.id;
-    req.userRole = decoded.role;
-    next();
-  });
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        if (err) {
+            console.error('JWT Error:', err);
+            return res.status(401).send({ message: 'Unauthorized: Invalid Token.' });
+        }
+        console.log('Decoded Token:', decoded);
+        req.userId = decoded.id;
+        req.userRole = decoded.role;
+        next();
+    });
 };
 
 // --- Admin Verification Middleware ---
 const verifyAdmin = (req, res, next) => {
-  if (req.userRole !== 'admin') {
-    return res.status(403).send({ message: "Forbidden: Requires Admin Role!" });
-  }
-  next();
+    console.log('User Role:', req.userRole);
+    if (req.userRole !== 'admin') {
+        return res.status(403).send({ message: "Forbidden: Requires Admin Role!" });
+    }
+    next();
 };
 
-// --- Location Search API Route (for auto-suggest) ---
-app.get('/api/locations/search', async (req, res) => {
-  const { keyword } = req.query;
-  if (!keyword) {
-    return res.status(400).json({ message: 'Keyword is required.' });
-  }
-
-  try {
-    const response = await amadeus.referenceData.locations.get({
-      keyword: keyword,
-      subType: Amadeus.location.any, // Search for both cities and airports
-    });
-
-    // Map the response to a simpler format for the frontend
-    const locations = response.data.map(location => ({
-      name: `${location.name} (${location.iataCode})`,
-      iataCode: location.iataCode,
-      subType: location.subType, // 'CITY' or 'AIRPORT'
-      countryCode: location.address.countryCode,
-    }));
-
-    res.json(locations);
-  } catch (error) {
-    console.error('Amadeus Location Search Error:', error.response ? error.response.data : error.message);
-    res.status(500).json({ message: 'Failed to fetch locations.', error: error.response?.data });
-  }
+// --- Temporary Test Endpoint ---
+app.get('/api/test-balance/:id', async (req, res) => {
+    const { id } = req.params;
+    console.log(`[Test API] Received request for user ID: ${id}`);
+    try {
+        const [rows] = await pool.execute('SELECT wallet_balance, name, email FROM users WHERE id = ?', [id]);
+        if (rows.length > 0) {
+            console.log(`[Test API] Database returned:`, rows[0]);
+            res.json({ message: 'Test successful', data: rows[0] });
+        } else {
+            console.log(`[Test API] User not found for ID: ${id}`);
+            res.status(404).json({ message: 'Test failed: User not found' });
+        }
+    } catch (error) {
+        console.error('[Test API] Error:', error);
+        res.status(500).json({ message: 'Test failed: Server error' });
+    }
 });
-
-
 
 // --- User API Routes ---
 app.get('/api/users/profile', verifyToken, async (req, res) => {
@@ -150,7 +110,7 @@ app.get('/api/users/wallet', verifyToken, async (req, res) => {
     try {
         // CORRECTED: Fetching from the 'wallets' table as per user feedback.
         const [rows] = await pool.execute('SELECT balance, currency FROM wallets WHERE user_id = ?', [req.userId]);
-        
+
         if (rows.length > 0) {
             // The row already contains balance and currency.
             res.json(rows[0]);
@@ -345,53 +305,21 @@ app.post('/api/hotels/book', verifyToken, async (req, res) => {
     }
 });
 
-app.get('/api/flights/search', async (req, res) => {
-    const { origin, destination, departureDate, tripType, passengers } = req.query;
-
-    if (!origin || !destination || !departureDate) {
-        return res.status(400).json({ message: 'Origin, Destination, and Departure Date are required.' });
-    }
-
-    try {
-        const response = await amadeus.shopping.flightOffersSearch.get({
-            originLocationCode: origin,
-            destinationLocationCode: destination,
-            departureDate: departureDate,
-            adults: passengers || '1',
-            currencyCode: 'INR',
-            max: 25 // Limit the number of results
-        });
-
-        // Map the Amadeus response to the format our frontend expects
-        const outboundFlights = response.data.map(offer => {
-            const itinerary = offer.itineraries[0]; // Assuming one itinerary for simplicity
-            const segment = itinerary.segments[0]; // Assuming one segment for simplicity
-
-            return {
-                id: offer.id,
-                airline: segment.carrierCode, // This will be an IATA code like '6E'
-                flightNumber: `${segment.carrierCode} ${segment.number}`,
-                origin: segment.departure.iataCode,
-                destination: segment.arrival.iataCode,
-                departure: segment.departure.at,
-                arrival: segment.arrival.at,
-                duration: itinerary.duration.replace('PT', '').replace('H', 'h ').replace('M', 'm'),
-                stops: `${itinerary.segments.length - 1} Stop(s)`,
-                price: parseFloat(offer.price.total),
-                currency: offer.price.currency,
-            };
-        });
-        
-        // For now, we'll return an empty array for return flights as the logic is more complex
-        res.json({
-            outboundFlights,
-            returnFlights: [] 
-        });
-
-    } catch (error) {
-        console.error('Amadeus API Error:', error.response ? error.response.data : error.message);
-        res.status(500).json({ message: 'Failed to fetch flights from provider.', error: error.response?.data });
-    }
+app.get('/api/flights/search', verifyToken, async (req, res) => {
+    // In a real app, you'd use the query params to search a flight database or API.
+    // For this demo, we'll return mock data.
+    const mockFlights = [
+        { id: 1, airline: 'IndiGo', flightNumber: '6E 204', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T08:00:00', arrival: '2024-08-01T10:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4500, currency: 'INR' },
+        { id: 2, airline: 'Vistara', flightNumber: 'UK 996', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T09:30:00', arrival: '2024-08-01T11:35:00', duration: '2h 5m', stops: 'Non-stop', price: 5200, currency: 'INR' },
+        { id: 3, airline: 'Air India', flightNumber: 'AI 805', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T11:00:00', arrival: '2024-08-01T13:00:00', duration: '2h 0m', stops: 'Non-stop', price: 4800, currency: 'INR' },
+        { id: 4, airline: 'SpiceJet', flightNumber: 'SG 871', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T14:00:00', arrival: '2024-08-01T16:15:00', duration: '2h 15m', stops: 'Non-stop', price: 4300, currency: 'INR' },
+        { id: 5, airline: 'IndiGo', flightNumber: '6E 555', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T16:30:00', arrival: '2024-08-01T18:30:00', duration: '2h 0m', stops: 'Non-stop', price: 4650, currency: 'INR' },
+        { id: 6, airline: 'Vistara', flightNumber: 'UK 951', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T18:00:00', arrival: '2024-08-01T20:10:00', duration: '2h 10m', stops: 'Non-stop', price: 5500, currency: 'INR' },
+        { id: 7, airline: 'Air India', flightNumber: 'AI 665', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T20:30:00', arrival: '2024-08-01T22:30:00', duration: '2h 0m', stops: 'Non-stop', price: 5100, currency: 'INR' },
+        { id: 8, airline: 'IndiGo', flightNumber: '6E 2041', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T06:00:00', arrival: '2024-08-01T09:15:00', duration: '3h 15m', stops: '1 Stop', price: 6200, currency: 'INR' },
+        { id: 9, airline: 'Vistara', flightNumber: 'UK 888', origin: 'DEL', destination: 'BOM', departure: '2024-08-01T12:00:00', arrival: '2024-08-01T16:00:00', duration: '4h 0m', stops: '1 Stop', price: 5800, currency: 'INR' },
+    ];
+    res.json(mockFlights);
 });
 
 app.post('/api/flights/book', verifyToken, async (req, res) => {
@@ -461,139 +389,119 @@ app.post('/api/flights/book', verifyToken, async (req, res) => {
 
 // --- Authentication API Routes ---
 app.post(
-  '/api/auth/register',
-  [
-    body('name', 'Name is required').not().isEmpty().trim().escape(),
-    body('email', 'Please include a valid email').isEmail().normalizeEmail(),
-    body('password', 'Password must be at least 8 characters long').isLength({ min: 8 })
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+    '/api/auth/register',
+    [
+        body('name', 'Name is required').not().isEmpty().trim().escape(),
+        body('email', 'Please include a valid email').isEmail().normalizeEmail(),
+        body('password', 'Password must be at least 8 characters long').isLength({ min: 8 })
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
 
-    const { email, password, name, role = 'agent' } = req.body;
-    try {
-      const hashedPassword = await bcrypt.hash(password, 8);
-      
-      // Set initial wallet balance for agents
-      const initialWalletBalance = role === 'agent' ? 1000.00 : 0.00;
+        const { email, password, name, role = 'agent' } = req.body;
+        try {
+            const hashedPassword = await bcrypt.hash(password, 8);
 
-      const [result] = await pool.execute(
-        'INSERT INTO users (email, password_hash, name, role, kyc_status, wallet_balance) VALUES (?, ?, ?, ?, ?, ?)',
-        [email, hashedPassword, name, role, 'none', initialWalletBalance]
-      );
-      res.status(201).send({ message: 'User registered successfully!', userId: result.insertId });
-    } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(409).send({ message: 'Email already exists.' });
-      }
-      console.error('Registration error:', error);
-      res.status(500).send({ message: 'Failed to register user.' });
+            // Set initial wallet balance for agents
+            const initialWalletBalance = role === 'agent' ? 1000.00 : 0.00;
+
+            const [result] = await pool.execute(
+                'INSERT INTO users (email, password_hash, name, role, kyc_status, wallet_balance) VALUES (?, ?, ?, ?, ?, ?)',
+                [email, hashedPassword, name, role, 'none', initialWalletBalance]
+            );
+            res.status(201).send({ message: 'User registered successfully!', userId: result.insertId });
+        } catch (error) {
+            if (error.code === 'ER_DUP_ENTRY') {
+                return res.status(409).send({ message: 'Email already exists.' });
+            }
+            console.error('Registration error:', error);
+            res.status(500).send({ message: 'Failed to register user.' });
+        }
     }
-  }
 );
 
-app.post('/api/auth/login',
-  [
-    body('email', 'Please include a valid email').isEmail().normalizeEmail(),
-    body('password', 'Password is required').not().isEmpty()
-  ],
-  async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { email, password } = req.body;
-  try {
-    const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
-    if (rows.length === 0) {
-      return res.status(404).send({ message: 'User not found.' });
+app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).send({ message: 'Please provide email and password.' });
+    try {
+        const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
+        if (rows.length === 0) {
+            return res.status(404).send({ message: 'User not found.' });
+        }
+        const user = rows[0];
+        const passwordIsValid = await bcrypt.compare(password, user.password_hash);
+        if (!passwordIsValid) {
+            return res.status(401).send({ accessToken: null, message: 'Invalid Password!' });
+        }
+        const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: 86400 });
+        res.status(200).send({ id: user.id, name: user.name, role: user.role, accessToken: token });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).send({ message: 'Error logging in.' });
     }
-    const user = rows[0];
-    const passwordIsValid = await bcrypt.compare(password, user.password_hash);
-    if (!passwordIsValid) {
-      return res.status(401).send({ accessToken: null, message: 'Invalid Password!' });
-    }
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: 86400 });
-    res.status(200).send({ id: user.id, name: user.name, role: user.role, accessToken: token });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).send({ message: 'Error logging in.' });
-  }
 });
 
 app.post('/api/auth/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  try {
-    const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
-
-    if (users.length === 0) {
-      // Security measure: Don't reveal if an email is registered or not.
-      return res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
-    }
-
-    const user = users[0];
-
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    const expirationDate = new Date(Date.now() + 3600000); // 1 hour
-
-    await pool.execute(
-      'UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?',
-      [hashedToken, expirationDate, user.id]
-    );
-
-    const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
-    const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to: user.email,
-      subject: 'Password Reset Request',
-      html: generatePasswordResetEmail({ resetUrl })
-    };
-
+    const { email } = req.body;
     try {
-      const info = await transporter.sendMail(mailOptions);
-      res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
-    } catch (emailError) {
-      console.error('[Forgot Password] Error sending email:', emailError);
-      // Even if email fails, we don't want to leak information to the client.
-      // The internal log is what matters for debugging.
-      res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
+        const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
+        }
+        const user = users[0];
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+        const expirationDate = new Date(Date.now() + 3600000); // 1 hour
+        await pool.execute(
+            'UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?',
+            [hashedToken, expirationDate, user.id]
+        );
+        const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
+        const mailOptions = {
+            from: process.env.EMAIL_FROM,
+            to: user.email,
+            subject: 'Password Reset Request',
+            html: `<p>You are receiving this email because you (or someone else) have requested the reset of the password for your account.</p>
+             <p>Please click on the following link, or paste it into your browser to complete the process:</p>
+             <p><a href="${resetUrl}">${resetUrl}</a></p>
+             <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`
+        };
+        await transporter.sendMail(mailOptions);
+        res.status(200).send({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    } catch (error) {
+        console.error('Forgot Password error:', error);
+        res.status(500).send({ message: 'An error occurred while processing your request.' });
     }
-  } catch (error) {
-    console.error('[Forgot Password] General error:', error);
-    res.status(500).send({ message: 'An error occurred while processing your request.' });
-  }
 });
 
 app.post('/api/auth/reset-password', async (req, res) => {
-  const { token, password } = req.body;
-  if (!token || !password) {
-    return res.status(400).send({ message: 'Token and new password are required.' });
-  }
-  try {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-    const [users] = await pool.execute(
-      'SELECT * FROM users WHERE password_reset_token = ? AND password_reset_expires > NOW()',
-      [hashedToken]
-    );
-    if (users.length === 0) {
-      return res.status(400).send({ message: 'Password reset token is invalid or has expired.' });
+    const { token, password } = req.body;
+    if (!token || !password) {
+        return res.status(400).send({ message: 'Token and new password are required.' });
     }
-    const user = users[0];
-    const hashedPassword = await bcrypt.hash(password, 8);
-    await pool.execute(
-      'UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL WHERE id = ?',
-      [hashedPassword, user.id]
-    );
-    res.status(200).send({ message: 'Password has been updated successfully.' });
-  } catch (error) {
-    console.error('Reset Password error:', error);
-    res.status(500).send({ message: 'An error occurred while resetting your password.' });
-  }
+    try {
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+        const [users] = await pool.execute(
+            'SELECT * FROM users WHERE password_reset_token = ? AND password_reset_expires > NOW()',
+            [hashedToken]
+        );
+        if (users.length === 0) {
+            return res.status(400).send({ message: 'Password reset token is invalid or has expired.' });
+        }
+        const user = users[0];
+        const hashedPassword = await bcrypt.hash(password, 8);
+        await pool.execute(
+            'UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL WHERE id = ?',
+            [hashedPassword, user.id]
+        );
+        res.status(200).send({ message: 'Password has been updated successfully.' });
+    } catch (error) {
+        console.error('Reset Password error:', error);
+        res.status(500).send({ message: 'An error occurred while resetting your password.' });
+    }
 });
 
 // --- Server Start ---
@@ -905,45 +813,59 @@ app.put('/api/admin/refunds/:refundId', verifyToken, verifyAdmin, async (req, re
 
 // Mock data for analytics
 const analyticsData = [
-  { name: 'Jan', sales: 4000, bookings: 24 },
-  { name: 'Feb', sales: 3000, bookings: 13 },
-  // ... more data
+    { name: 'Jan', sales: 4000, bookings: 24 },
+    { name: 'Feb', sales: 3000, bookings: 13 },
+    // ... more data
 ];
 
 app.get('/api/admin/analytics', verifyToken, verifyAdmin, (req, res) => {
-  res.json(analyticsData);
+    res.json(analyticsData);
 });
 
 // Mock data for commissions
 let commissionRates = {
-  flight_commission_rate: 5.0,
-  hotel_commission_rate: 10.0,
+    flight_commission_rate: 5.0,
+    hotel_commission_rate: 10.0,
 };
 
 app.get('/api/admin/commissions', verifyToken, verifyAdmin, (req, res) => {
-  res.json(commissionRates);
+    res.json(commissionRates);
 });
 
 app.post('/api/admin/commissions', verifyToken, verifyAdmin, (req, res) => {
-  const { flight_commission_rate, hotel_commission_rate } = req.body;
-  commissionRates = {
-    flight_commission_rate,
-    hotel_commission_rate,
-  };
-  res.json({ message: 'Commission rates updated successfully.' });
+    const { flight_commission_rate, hotel_commission_rate } = req.body;
+    commissionRates = {
+        flight_commission_rate,
+        hotel_commission_rate,
+    };
+    res.json({ message: 'Commission rates updated successfully.' });
 });
 
 // Mock data for support tickets
 const supportTickets = [
-  { id: 'TKT123', subject: 'Login Issue', agent: 'Test Agent', status: 'Open' },
-  { id: 'TKT124', subject: 'Booking Failed', agent: 'Another Agent', status: 'Closed' },
+    { id: 'TKT123', subject: 'Login Issue', agent: 'Test Agent', status: 'Open' },
+    { id: 'TKT124', subject: 'Booking Failed', agent: 'Another Agent', status: 'Closed' },
 ];
 
 app.get('/api/admin/tickets', verifyToken, verifyAdmin, (req, res) => {
-  res.json(supportTickets);
+    res.json(supportTickets);
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  console.log('Connected to database:', dbConfig.database);
+    console.log(`Server is running on http://localhost:${port}`);
+    console.log('Connected to database:', dbConfig.database);
+});
+
+
+// A more advanced health check
+app.get('/api/health', async (req, res) => {
+    try {
+        // A simple, fast query to check DB connection.
+        // Replace with your actual database connection object.
+        await db.promise().query('SELECT 1');
+        res.status(200).json({ status: 'UP', database: 'connected' });
+    } catch (error) {
+        // If the query fails, the app is unhealthy
+        res.status(503).json({ status: 'DOWN', database: 'disconnected', error: error.message });
+    }
 });
